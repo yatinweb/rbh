@@ -10,8 +10,8 @@ RUN /var/lib/dpkg/info/ca-certificates-java.postinst configure
 
 # download and install Gradle
 # https://services.gradle.org/distributions/
-ARG GRADLE_VERSION=4.7
-ARG GRADLE_DIST=bin
+ARG GRADLE_VERSION=6.5
+ARG GRADLE_DIST=all
 RUN cd /opt && \
     wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-${GRADLE_DIST}.zip && \
     unzip gradle*.zip && \
@@ -41,7 +41,7 @@ RUN /opt/android/sdk/tools/bin/sdkmanager "build-tools;30.0.2" > /dev/null
 RUN /opt/android/sdk/tools/bin/sdkmanager "platforms;android-30" > /dev/null
 
 ENV ANDROID_SDK_ROOT /opt/android/sdk
-ENV BUILD_TOOLS_VER 30.0.1
+ENV BUILD_TOOLS_VER 30.0.2
 
 # set the environment variables
 ENV GRADLE_HOME /opt/gradle
