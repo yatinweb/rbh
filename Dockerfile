@@ -4,12 +4,13 @@ LABEL MAINTAINER Yatin Patel
 RUN apt-get update
 RUN apt-get -y install openjdk-8-jdk wget curl unzip xz-utils python build-essential ssh git
 
+
 # Setup certificates in openjdk-8
 RUN /var/lib/dpkg/info/ca-certificates-java.postinst configure
 
 # download and install Gradle
 # https://services.gradle.org/distributions/
-ARG GRADLE_VERSION=6.4.1
+ARG GRADLE_VERSION=4.7
 ARG GRADLE_DIST=bin
 RUN cd /opt && \
     wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-${GRADLE_DIST}.zip && \
@@ -22,26 +23,29 @@ RUN curl -sL https://deb.nodesource.com/setup_12.x | bash - && \
     apt-get install -y nodejs
 
 # download and install Android SDK
-# https://developer.android.com/studio#command-tools
-ARG ANDROID_SDK_VERSION=6609375
-ENV ANDROID_SDK_ROOT /opt/android-sdk
-RUN mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools && \
-    wget -q https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_VERSION}_latest.zip && \
-    unzip *tools*linux*.zip -d ${ANDROID_SDK_ROOT}/cmdline-tools && \
-    rm *tools*linux*.zip
+RUN mkdir -p /opt/android/sdk && mkdir .android && \
+    cd /opt/android/sdk && \
+    curl -o sdk.zip https://dl.google.com/android/repository/sdk-tools-linux-3859397.zip && \
+    unzip sdk.zip && \
+    rm sdk.zip
+
+RUN yes | /opt/android/sdk/tools/bin/sdkmanager --licenses
+RUN /opt/android/sdk/tools/bin/sdkmanager --update > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager platform-tools > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager tools > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager emulator > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "extras;android;m2repository" > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "extras;google;m2repository" > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "extras;google;google_play_services" > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "build-tools;30.0.2" > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "platforms;android-30" > /dev/null
+
+ENV ANDROID_SDK_ROOT /opt/android/sdk
+ENV BUILD_TOOLS_VER 30.0.1
 
 # set the environment variables
 ENV GRADLE_HOME /opt/gradle
-ENV PATH ${PATH}:${GRADLE_HOME}/bin:${KOTLIN_HOME}/bin:${ANDROID_SDK_ROOT}/cmdline-tools/tools/bin:${ANDROID_SDK_ROOT}/platform-tools:${ANDROID_SDK_ROOT}/emulator
-# WORKAROUND: for issue https://issuetracker.google.com/issues/37137213
-ENV LD_LIBRARY_PATH ${ANDROID_SDK_ROOT}/emulator/lib64:${ANDROID_SDK_ROOT}/emulator/lib64/qt/lib
-# patch emulator issue: Running as root without --no-sandbox is not supported. See https://crbug.com/638180.
-# https://doc.qt.io/qt-5/qtwebengine-platform-notes.html#sandboxing-support
-ENV QTWEBENGINE_DISABLE_SANDBOX 1
-
-# accept the license agreements of the SDK components
-ADD license_accepter.sh /opt/
-RUN chmod +x /opt/license_accepter.sh && /opt/license_accepter.sh $ANDROID_SDK_ROOT
+ENV PATH ${PATH}:${GRADLE_HOME}/bin:${ANDROID_SDK_ROOT}/tools/bin:${ANDROID_SDK_ROOT}/platform-tools:${ANDROID_SDK_ROOT}/emulator:${ANDROID_SDK_ROOT}/build-tools/${BUILD_TOOLS_VER}
 
 # Install chrome and dependencies (for puppeteer)
 RUN apt-get update && apt-get install -y wget --no-install-recommends \
