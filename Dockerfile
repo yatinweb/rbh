@@ -10,7 +10,7 @@ RUN /var/lib/dpkg/info/ca-certificates-java.postinst configure
 
 # download and install Gradle
 # https://services.gradle.org/distributions/
-ARG GRADLE_VERSION=6.5
+ARG GRADLE_VERSION=6.8
 ARG GRADLE_DIST=all
 RUN cd /opt && \
     wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-${GRADLE_DIST}.zip && \
