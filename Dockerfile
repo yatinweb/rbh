@@ -10,7 +10,7 @@ RUN /var/lib/dpkg/info/ca-certificates-java.postinst configure
 
 # download and install Gradle
 # https://services.gradle.org/distributions/
-ARG GRADLE_VERSION=6.7.1
+ARG GRADLE_VERSION=7.4.2
 ARG GRADLE_DIST=all
 RUN cd /opt && \
     wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-${GRADLE_DIST}.zip && \
@@ -37,11 +37,11 @@ RUN /opt/android/sdk/tools/bin/sdkmanager tools > /dev/null
 RUN /opt/android/sdk/tools/bin/sdkmanager "extras;android;m2repository" > /dev/null
 RUN /opt/android/sdk/tools/bin/sdkmanager "extras;google;m2repository" > /dev/null
 RUN /opt/android/sdk/tools/bin/sdkmanager "extras;google;google_play_services" > /dev/null
-RUN /opt/android/sdk/tools/bin/sdkmanager "build-tools;30.0.3" > /dev/null
-RUN /opt/android/sdk/tools/bin/sdkmanager "platforms;android-30" > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "build-tools;32.0.0" > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "platforms;android-32" > /dev/null
 
 ENV ANDROID_SDK_ROOT /opt/android/sdk
-ENV BUILD_TOOLS_VER 30.0.3
+ENV BUILD_TOOLS_VER 32.0.0
 
 # set the environment variables
 ENV GRADLE_HOME /opt/gradle
