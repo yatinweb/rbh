@@ -1,26 +1,51 @@
 FROM ubuntu:18.04
-MAINTAINER Roberto Delgado
-
-ENV NODE_VERSION 11.9.2
-ENV GRADLE_VERSION 4.10.2
+LABEL MAINTAINER Yatin Patel
 
 RUN apt-get update
 RUN apt-get -y install openjdk-8-jdk wget curl unzip xz-utils python build-essential ssh git
 
+
 # Setup certificates in openjdk-8
 RUN /var/lib/dpkg/info/ca-certificates-java.postinst configure
 
-# Set path
-ENV PATH ${PATH}:/usr/local/gradle-$GRADLE_VERSION/bin
+# download and install Gradle
+# https://services.gradle.org/distributions/
+ARG GRADLE_VERSION=6.7.1
+ARG GRADLE_DIST=all
+RUN cd /opt && \
+    wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-${GRADLE_DIST}.zip && \
+    unzip gradle*.zip && \
+    ls -d */ | sed 's/\/*$//g' | xargs -I{} mv {} gradle && \
+    rm gradle*.zip
 
 # Install nodejs
-RUN curl -sL https://deb.nodesource.com/setup_8.x | bash - && \
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
     apt-get install -y nodejs
 
-# Install gradle
-RUN wget https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip && \
-    unzip gradle-$GRADLE_VERSION-bin.zip && \
-    rm -f gradle-$GRADLE_VERSION-bin.zip
+# download and install Android SDK
+RUN mkdir -p /opt/android/sdk && mkdir .android && \
+    cd /opt/android/sdk && \
+    curl -o sdk.zip https://dl.google.com/android/repository/sdk-tools-linux-3859397.zip && \
+    unzip sdk.zip && \
+    rm sdk.zip
+
+RUN yes | /opt/android/sdk/tools/bin/sdkmanager --licenses
+RUN /opt/android/sdk/tools/bin/sdkmanager --update > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager platform-tools > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager tools > /dev/null
+#RUN /opt/android/sdk/tools/bin/sdkmanager emulator > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "extras;android;m2repository" > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "extras;google;m2repository" > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "extras;google;google_play_services" > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "build-tools;30.0.3" > /dev/null
+RUN /opt/android/sdk/tools/bin/sdkmanager "platforms;android-30" > /dev/null
+
+ENV ANDROID_SDK_ROOT /opt/android/sdk
+ENV BUILD_TOOLS_VER 30.0.3
+
+# set the environment variables
+ENV GRADLE_HOME /opt/gradle
+ENV PATH ${PATH}:${GRADLE_HOME}/bin:${ANDROID_SDK_ROOT}/tools/bin:${ANDROID_SDK_ROOT}/platform-tools:${ANDROID_SDK_ROOT}/emulator:${ANDROID_SDK_ROOT}/build-tools/${BUILD_TOOLS_VER}
 
 # Install chrome and dependencies (for puppeteer)
 RUN apt-get update && apt-get install -y wget --no-install-recommends \
@@ -32,5 +57,7 @@ RUN apt-get update && apt-get install -y wget --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get purge --auto-remove -y curl \
     && rm -rf /src/*.deb
+
+RUN npm install -g ionic && npm install i -g cordova
 
 WORKDIR /app
