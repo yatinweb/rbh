@@ -1,62 +1,109 @@
-FROM ubuntu:18.04
+FROM --platform=linux/amd64 ubuntu:23.10
+
 LABEL MAINTAINER Yatin Patel
 
-RUN apt-get update
-RUN apt-get -y install openjdk-8-jdk wget curl unzip xz-utils python build-essential ssh git
+# Command line tools only
+# https://developer.android.com/studio/index.html
+ENV ANDROID_SDK_TOOLS_VERSION 10406996
+ENV ANDROID_SDK_TOOLS_CHECKSUM 8919e8752979db73d8321e9babe2caedcc393750817c1a5f56c128ec442fb540
 
+ENV GRADLE_VERSION 7.6
 
-# Setup certificates in openjdk-8
-RUN /var/lib/dpkg/info/ca-certificates-java.postinst configure
+ENV ANDROID_HOME "/opt/android-sdk-linux"
+ENV ANDROID_SDK_ROOT $ANDROID_HOME
+ENV PATH $PATH:$ANDROID_HOME/cmdline-tools:$ANDROID_HOME/cmdline-tools/bin:$ANDROID_HOME/platform-tools
 
-# download and install Gradle
-# https://services.gradle.org/distributions/
-ARG GRADLE_VERSION=7.4.2
-ARG GRADLE_DIST=all
-RUN cd /opt && \
-    wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-${GRADLE_DIST}.zip && \
-    unzip gradle*.zip && \
-    ls -d */ | sed 's/\/*$//g' | xargs -I{} mv {} gradle && \
-    rm gradle*.zip
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG en_US.UTF-8
 
-# Install nodejs
-RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
-    apt-get install -y nodejs
+# Add base environment
+RUN apt-get -qq update \
+    && apt-get -qqy --no-install-recommends install \
+    apt-utils \
+    build-essential \
+    openjdk-22-jdk \
+    openjdk-22-jre-headless \
+    software-properties-common \
+    libssl-dev \
+    libffi-dev \
+    python3-dev \
+    cargo \
+    pkg-config\  
+    libstdc++6 \
+    libpulse0 \
+    libglu1-mesa \
+    openssh-server \
+    zip \
+    unzip \
+    curl \
+    lldb \
+    wget \
+    xz-utils \
+    git > /dev/null \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+   
+# Download and unzip Android SDK Tools
+RUN curl -s https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS_VERSION}_latest.zip > /tools.zip \
+    && echo "$ANDROID_SDK_TOOLS_CHECKSUM ./tools.zip" | sha256sum -c \
+    && unzip -qq /tools.zip -d $ANDROID_HOME \
+    && rm -v /tools.zip
 
-# download and install Android SDK
-RUN mkdir -p /opt/android/sdk && mkdir .android && \
-    cd /opt/android/sdk && \
-    curl -o sdk.zip https://dl.google.com/android/repository/sdk-tools-linux-3859397.zip && \
-    unzip sdk.zip && \
-    rm sdk.zip
+# Accept licenses
+RUN mkdir -p $ANDROID_HOME/licenses/ \
+    && echo "8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license \
+    && echo "84831b9409646a918e30573bab4c9c91346d8abd\n504667f4c0de7af1a06de9f4b1727b84351f2910" > $ANDROID_HOME/licenses/android-sdk-preview-license --licenses \
+    && yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --licenses --sdk_root=${ANDROID_SDK_ROOT}
 
-RUN yes | /opt/android/sdk/tools/bin/sdkmanager --licenses
-RUN /opt/android/sdk/tools/bin/sdkmanager --update > /dev/null
-RUN /opt/android/sdk/tools/bin/sdkmanager platform-tools > /dev/null
-RUN /opt/android/sdk/tools/bin/sdkmanager tools > /dev/null
-#RUN /opt/android/sdk/tools/bin/sdkmanager emulator > /dev/null
-RUN /opt/android/sdk/tools/bin/sdkmanager "extras;android;m2repository" > /dev/null
-RUN /opt/android/sdk/tools/bin/sdkmanager "extras;google;m2repository" > /dev/null
-RUN /opt/android/sdk/tools/bin/sdkmanager "extras;google;google_play_services" > /dev/null
-RUN /opt/android/sdk/tools/bin/sdkmanager "build-tools;32.0.0" > /dev/null
-RUN /opt/android/sdk/tools/bin/sdkmanager "platforms;android-32" > /dev/null
+# Add non-root user 
+RUN groupadd -r mobiledevops \
+    && useradd --no-log-init -r -g mobiledevops mobiledevops \
+    && mkdir -p /home/mobiledevops/.android \
+    && mkdir -p /home/mobiledevops/app \
+    && touch /home/mobiledevops/.android/repositories.cfg \
+    && chown --recursive mobiledevops:mobiledevops /home/mobiledevops \
+    && chown --recursive mobiledevops:mobiledevops /home/mobiledevops/app \
+    && chown --recursive mobiledevops:mobiledevops $ANDROID_HOME
 
-ENV ANDROID_SDK_ROOT /opt/android/sdk
-ENV BUILD_TOOLS_VER 32.0.0
+# Set non-root user as default      
+ENV HOME /home/mobiledevops
+USER mobiledevops
+WORKDIR $HOME/app
 
-# set the environment variables
-ENV GRADLE_HOME /opt/gradle
-ENV PATH ${PATH}:${GRADLE_HOME}/bin:${ANDROID_SDK_ROOT}/tools/bin:${ANDROID_SDK_ROOT}/platform-tools:${ANDROID_SDK_ROOT}/emulator:${ANDROID_SDK_ROOT}/build-tools/${BUILD_TOOLS_VER}
+# Install SDKMAN
+RUN curl -s "https://get.sdkman.io" | bash
+SHELL ["/bin/bash", "-c"]   
 
-# Install chrome and dependencies (for puppeteer)
-RUN apt-get update && apt-get install -y wget --no-install-recommends \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
-    && apt-get update \
-    && apt-get install -y google-chrome-unstable fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst \
-      --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get purge --auto-remove -y curl \
-    && rm -rf /src/*.deb
+# Install Android packages
+ADD packages.txt $HOME
+
+# Update sdkmanager
+RUN $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=${ANDROID_SDK_ROOT} --update \
+    && while read -r pkg; do PKGS="${PKGS}${pkg} "; done < $HOME/packages.txt \
+    && $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=${ANDROID_SDK_ROOT} $PKGS \
+    && rm $HOME/packages.txt
+
+# Install Gradle
+RUN source "${HOME}/.sdkman/bin/sdkman-init.sh" \
+    && sdk install gradle ${GRADLE_VERSION} \
+    && sdk install java 11.0.22-amzn \
+    && sdk default java 11.0.22-amzn
+
+# Install Node JS
+USER root
+RUN mkdir /usr/local/nvm
+ENV NVM_DIR /usr/local/nvm
+ENV NODE_VERSION 16.14.1
+RUN curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash \
+    && . $NVM_DIR/nvm.sh \
+    && nvm install $NODE_VERSION \
+    && nvm alias default $NODE_VERSION \
+    && nvm use default
+
+ENV NODE_PATH $NVM_DIR/v$NODE_VERSION/lib/node_modules
+ENV PATH $NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
+
+# Install NPM 8.5.0
+RUN npm install -g npm@8.5.0
 
 RUN npm install -g ionic && npm install i -g cordova
 

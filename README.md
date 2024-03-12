@@ -1,7 +1,8 @@
 # ubuntu-java-node-gradle
-Docker image based on Ubuntu 18.04 with Java, Gradle and node.
+Docker image based on Ubuntu 23.10 with Java, Gradle and node.
 
 ## App Details
-* `OpenJDK-8-JDK`
-* `Node` v16.x
-* `Gradle` v6.7.1
+* `OpenJDK-11-JDK`
+* `Node` v16.14.1
+* `NPM` v8.5.0
+* `Gradle` v7.6
